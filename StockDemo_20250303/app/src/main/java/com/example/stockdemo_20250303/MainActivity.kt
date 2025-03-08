@@ -13,37 +13,34 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.example.stockdemo_20250303.net.Stock
+import com.example.stockdemo_20250303.net.MsgArray
 import com.example.stockdemo_20250303.ui.theme.StockDemo_20250303Theme
-import com.example.stockdemo_20250303.viewModel.SORT_CONDITION
+import com.example.stockdemo_20250303.view.ApiErrorView
+import com.example.stockdemo_20250303.view.StockTextSingleLine
+import com.example.stockdemo_20250303.view.StockTextAlignCenter
+import com.example.stockdemo_20250303.view.TextFieldLabel
 import com.example.stockdemo_20250303.viewModel.SORT_TYPE
 import com.example.stockdemo_20250303.viewModel.StockViewModel
-import kotlinx.coroutines.isActive
 
 class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
@@ -67,9 +64,8 @@ class MainActivity : ComponentActivity() {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(innerPadding)
-                            .background(MaterialTheme.colorScheme.background),
-                        contentAlignment = Alignment.Center) { 
+                            .padding(innerPadding),
+                        ) {
                         MainScreen()
                     }
                 }
@@ -82,10 +78,29 @@ class MainActivity : ComponentActivity() {
 fun MainScreen() {
 
     val viewModel = StockViewModel()
-    viewModel.getStocks()
+//    viewModel.getStocks(listOf("2330", "0050", "6547"))
 
-    Box(Modifier.padding(8.0.dp)) {
+    Column(Modifier.padding(8.0.dp)) {
+        MainTextField(viewModel = viewModel)
         StocksBody(viewModel)
+    }
+}
+
+@Composable
+fun MainTextField(viewModel: StockViewModel) {
+    var stockId by remember { mutableStateOf("") }
+
+    LaunchedEffect(stockId) {
+        viewModel.getStocks(listOf(stockId))
+    }
+
+    Box {   // todo: style
+        OutlinedTextField(
+            value = stockId,
+            onValueChange = { new -> stockId = new },
+            label = { TextFieldLabel(stockId) },
+            maxLines = 1
+        )
     }
 }
 
@@ -93,111 +108,76 @@ fun MainScreen() {
 fun StocksBody(viewModel: StockViewModel) {
     val stocks by viewModel.stocksState.collectAsState()
 
-    if (stocks.isNotEmpty()) {
+    if (!stocks.isNullOrEmpty()) {
         Column {
-            Row(horizontalArrangement = Arrangement.Center) {
-                Text(text = "證券代號", modifier = Modifier
+            Row {
+                Box(modifier = Modifier.weight(1f)) { StockTextSingleLine("證券名稱") }
+                Box(modifier = Modifier.weight(1f)) { StockTextAlignCenter("成交金額") }
+                Box(modifier = Modifier.weight(1f)) { StockTextAlignCenter("成交量") }
+                Box(modifier = Modifier
                     .weight(1f)
-                    .clickable { },
-                    style = TextStyle(fontSize = TextUnit.Unspecified), maxLines = 1)
-                Text(text = "證券名稱", modifier = Modifier.weight(1f), style = TextStyle(fontSize = TextUnit.Unspecified), maxLines = 1)
-//            Text(text = "成交股數", modifier = Modifier.weight(1f), style = TextStyle(fontSize = TextUnit.Unspecified), maxLines = 1)
-//            Text(text = "成交金額", modifier = Modifier.weight(1f), style = TextStyle(fontSize = TextUnit.Unspecified), maxLines = 1)
-                Text(text = "開盤價", modifier = Modifier
+                    .clickable { viewModel.sortData(SORT_TYPE.HIGHEST) }) { StockTextAlignCenter("最高價") }
+                Box(modifier = Modifier
                     .weight(1f)
-                    .clickable { viewModel.sortData(SORT_TYPE.OPEN) },
-                    style = TextStyle(fontSize = TextUnit.Unspecified), maxLines = 1)
-                Text(text = "最高價", modifier = Modifier
-                    .weight(1f)
-                    .clickable { viewModel.sortData(SORT_TYPE.HIGHEST) },
-                    style = TextStyle(fontSize = TextUnit.Unspecified), maxLines = 1)
-                Text(text = "最低價", modifier = Modifier
-                    .weight(1f)
-                    .clickable { viewModel.sortData(SORT_TYPE.LOWEST) },
-                    style = TextStyle(fontSize = TextUnit.Unspecified), maxLines = 1)
-//            Text(text = "收盤價", modifier = Modifier.weight(1f))
+                    .clickable { viewModel.sortData(SORT_TYPE.LOWEST) }) { StockTextAlignCenter("最低價") }
             }
-            Stocks(stocksData = stocks)
+            Stocks(stocksData = stocks!!)
         }
     } else {
-        Text(text = "No state")
+        ApiErrorView()
     }
 }
 
 @Composable
-fun StockTextStyle(text: String) {
-    Text(text = text, style = TextStyle(fontSize = TextUnit.Unspecified), maxLines = 1)
-}
+fun Stocks(stocksData: List<MsgArray>) {
+    Log.e("API_CLIENT", "Recompose")
+    val positionState = rememberLazyListState()
+    val firstScrollPosition by remember { derivedStateOf { positionState.firstVisibleItemIndex } }
 
-@Composable
-fun StocksTitle() {
-    Row(horizontalArrangement = Arrangement.Center) {
-        Box(Modifier.weight(1f)) { StockTextStyle(text = "證券代號") }
-        Box(Modifier.weight(1f)) { StockTextStyle(text = "證券名稱") }
-//            Text(text = "成交股數", modifier = Modifier.weight(1f), style = TextStyle(fontSize = TextUnit.Unspecified), maxLines = 1)
-//            Text(text = "成交金額", modifier = Modifier.weight(1f), style = TextStyle(fontSize = TextUnit.Unspecified), maxLines = 1)
-        Box(Modifier.weight(1f)) { StockTextStyle(text = "開盤價") }
-        Box(Modifier.weight(1f)) { StockTextStyle(text = "最高價") }
-        Box(Modifier.weight(1f)) { StockTextStyle(text = "最低價") }
-//            Text(text = "收盤價", modifier = Modifier.weight(1f))
-    }
-}
-
-@Composable
-fun Stocks(stocksData: List<Stock>) {
-    val positionState = rememberScrollState()
-
-    LaunchedEffect(positionState.value) {
-        Log.e("API_CLIENT", "Position: ${positionState.value}")
+    LaunchedEffect(firstScrollPosition) {
+        Log.e("API_CLIENT", "Position: ${firstScrollPosition}")
     }
 
     if (stocksData.isNotEmpty()) {
-        LazyColumn() {
+        LazyColumn(state = positionState) {
             items(count = stocksData.size) { i ->
                 StockDetail(stock = stocksData[i])
             }
         }
     } else {
         Row(horizontalArrangement = Arrangement.Center) {
-            StockTextStyle(text = "No data")
-            StockTextStyle(text = "No data")
-//            Text(text = "成交股數", modifier = Modifier.weight(1f), style = TextStyle(fontSize = TextUnit.Unspecified), maxLines = 1)
-//            Text(text = "成交金額", modifier = Modifier.weight(1f), style = TextStyle(fontSize = TextUnit.Unspecified), maxLines = 1)
-            StockTextStyle(text = "No data")
-            StockTextStyle(text = "No data")
-            StockTextStyle(text = "No data")
-//            Text(text = "收盤價", modifier = Modifier.weight(1f))
+            StockTextSingleLine(text = "No data")
+            StockTextSingleLine(text = "No data")
+            StockTextSingleLine(text = "No data")
+            StockTextSingleLine(text = "No data")
+            StockTextSingleLine(text = "No data")
         }
     }
 }
 
 @Composable
-fun StockDetail(stock: Stock) {
+fun StockDetail(stock: MsgArray) {
     Row(horizontalArrangement = Arrangement.Center) {
-        Box(Modifier.weight(1f)) { StockTextStyle(text = "${stock.code}") }
-        Box(Modifier.weight(1f)) { StockTextStyle(text = "${stock.name}") }
-//            Text(text = "成交股數", modifier = Modifier.weight(1f), style = TextStyle(fontSize = TextUnit.Unspecified), maxLines = 1)
-//            Text(text = "成交金額", modifier = Modifier.weight(1f), style = TextStyle(fontSize = TextUnit.Unspecified), maxLines = 1)
-        Box(Modifier.weight(1f)) { StockTextStyle(text = "${stock.openingPrice}") }
-        Box(Modifier.weight(1f)) { StockTextStyle(text = "${stock.highestPrice}") }
-        Box(Modifier.weight(1f)) { StockTextStyle(text = "${stock.lowestPrice}") }
-//            Text(text = "收盤價", modifier = Modifier.weight(1f))
+        Box(Modifier.weight(1f)) { StockTextSingleLine(text = "${stock.公司簡稱}") }
+        Box(Modifier.weight(1f)) { StockTextAlignCenter(text = "${stock.當前盤中成交價}") }
+        Box(Modifier.weight(1f)) { StockTextAlignCenter(text = "${stock.當前盤中盤成交量}") }
+        Box(Modifier.weight(1f)) { StockTextAlignCenter(text = "${stock.最高價格}") }
+        Box(Modifier.weight(1f)) { StockTextAlignCenter(text = "${stock.最低價格}") }
     }
 }
 
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    StockDemo_20250303Theme {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Color.LightGray),
-            contentAlignment = Alignment.Center
-        ) {
-            val stocks = emptyList<Stock>()
-            StocksTitle()
-            Stocks(stocksData = stocks)
-        }
-    }
-}
+//@Preview(showBackground = true)
+//@Composable
+//fun GreetingPreview() {
+//    StockDemo_20250303Theme {
+//        Box(
+//            modifier = Modifier
+//                .fillMaxSize()
+//                .background(Color.LightGray),
+//            contentAlignment = Alignment.Center
+//        ) {
+//            val stocks = emptyList<Stock>()
+//            Stocks(stocksData = stocks)
+//        }
+//    }
+//}
