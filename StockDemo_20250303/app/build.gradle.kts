@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
+    id ("kotlin-kapt")
 
     id("org.jetbrains.kotlin.plugin.serialization") version "1.8.0"
 }
@@ -66,6 +67,9 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 
+//    net
+    implementation(libs.logging.interceptor)
+    implementation(libs.okhttp)
     implementation(libs.retrofit)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.retrofit2.kotlinx.serialization.converter)
@@ -73,4 +77,8 @@ dependencies {
     implementation(libs.converter.scalars)
     implementation(libs.gson)
     implementation(libs.converter.gson)
+    implementation(libs.androidx.navigation.compose)
+//    dagger
+    implementation(libs.dagger)
+    kapt(libs.dagger.compiler)
 }
